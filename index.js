@@ -2,14 +2,14 @@ import { Client, GatewayIntentBits, Partials, Collection } from 'discord.js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 // Load environment variables
 dotenv.config();
 
 // Validate environment variables
 if (!process.env.TOKEN) {
-  console.error('❌ Error: TOKEN not found in .env file!');
+  console.error('❌ Error: TOKEN not found in environment variables!');
   process.exit(1);
 }
 
@@ -38,13 +38,19 @@ const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('
 
 for (const file of commandFiles) {
   const filePath = path.join(commandsPath, file);
-  const command = await import(`file://${filePath}`);
+  const fileUrl = pathToFileURL(filePath).href;
   
-  if (command.default && 'data' in command.default && 'execute' in command.default) {
-    client.commands.set(command.default.data.name, command.default);
-    console.log(`📝 Loaded command: ${command.default.data.name}`);
-  } else {
-    console.warn(`⚠️ Command at ${filePath} is missing required "data" or "execute" property`);
+  try {
+    const command = await import(fileUrl);
+    
+    if (command.default && 'data' in command.default && 'execute' in command.default) {
+      client.commands.set(command.default.data.name, command.default);
+      console.log(`📝 Loaded command: ${command.default.data.name}`);
+    } else {
+      console.warn(`⚠️ Command at ${file} is missing required "data" or "execute" property`);
+    }
+  } catch (error) {
+    console.error(`❌ Error loading command ${file}:`, error);
   }
 }
 
@@ -54,17 +60,23 @@ const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'
 
 for (const file of eventFiles) {
   const filePath = path.join(eventsPath, file);
-  const event = await import(`file://${filePath}`);
+  const fileUrl = pathToFileURL(filePath).href;
   
-  if (event.default && 'name' in event.default && 'execute' in event.default) {
-    if (event.default.once) {
-      client.once(event.default.name, (...args) => event.default.execute(...args, client));
+  try {
+    const event = await import(fileUrl);
+    
+    if (event.default && 'name' in event.default && 'execute' in event.default) {
+      if (event.default.once) {
+        client.once(event.default.name, (...args) => event.default.execute(...args, client));
+      } else {
+        client.on(event.default.name, (...args) => event.default.execute(...args, client));
+      }
+      console.log(`📅 Loaded event: ${event.default.name}`);
     } else {
-      client.on(event.default.name, (...args) => event.default.execute(...args, client));
+      console.warn(`⚠️ Event at ${file} is missing required "name" or "execute" property`);
     }
-    console.log(`📅 Loaded event: ${event.default.name}`);
-  } else {
-    console.warn(`⚠️ Event at ${filePath} is missing required "name" or "execute" property`);
+  } catch (error) {
+    console.error(`❌ Error loading event ${file}:`, error);
   }
 }
 
