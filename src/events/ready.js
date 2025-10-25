@@ -1,7 +1,7 @@
 import { Events, REST, Routes } from 'discord.js';
 import { BOT_CONFIG } from '../config/bot.js';
 import { TEAM_ROLE_IDS } from '../config/teams.js';
-import { hasTeamRole, findOrCreatePrivateChannel } from '../utils/channelManager.js';
+import { hasTeamRole, findOrCreatePrivateChannel, cleanupWelcomeChannels } from '../utils/channelManager.js';
 import { buildReminderEmbed } from '../utils/embedBuilder.js';
 import { getTeamSelectOptions } from '../config/teams.js';
 import { ActionRowBuilder, StringSelectMenuBuilder } from 'discord.js';
@@ -64,6 +64,31 @@ function startRoleCheckScheduler(client) {
 }
 
 /**
+ * Start the scheduler that cleans up welcome channels
+ */
+function startCleanupScheduler(client) {
+  const runCleanup = async () => {
+    try {
+      console.log('🧹 Starting welcome channel cleanup...');
+      
+      for (const [, guild] of client.guilds.cache) {
+        await cleanupWelcomeChannels(guild, TEAM_ROLE_IDS);
+      }
+      
+      console.log('✅ Welcome channel cleanup completed');
+    } catch (err) {
+      console.error('❌ Cleanup failed:', err);
+    }
+  };
+
+  // Run immediately on startup, then every 24 hours
+  runCleanup();
+  setInterval(runCleanup, BOT_CONFIG.CLEANUP_CHECK_INTERVAL);
+  
+  console.log(`⏰ Cleanup scheduler started (interval: ${BOT_CONFIG.CLEANUP_CHECK_INTERVAL / 3600000} hours)`);
+}
+
+/**
  * Register slash commands with Discord
  */
 async function registerSlashCommands(client) {
@@ -98,6 +123,9 @@ export default {
     
     // Start the role check scheduler
     startRoleCheckScheduler(client);
+    
+    // Start the cleanup scheduler
+    startCleanupScheduler(client);
     
     console.log('🚀 Bot is ready!');
   },

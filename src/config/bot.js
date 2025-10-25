@@ -7,6 +7,9 @@ export const BOT_CONFIG = {
   
   // Enable/disable auto-deletion of welcome channels
   AUTO_DELETE_CHANNELS: true,
+  
+  // How often to clean up orphaned welcome channels (in milliseconds)
+  CLEANUP_CHECK_INTERVAL: 24 * 60 * 60 * 1000, // 24 hours
 };
 
 export const INTENTS = {
